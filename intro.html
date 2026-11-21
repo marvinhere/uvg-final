@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Misión Web Inicial | Introducción a la programación web</title>
+<style>
+:root{font-family:system-ui,Segoe UI,Arial,sans-serif;color:#eaf4ff;background:#081522}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 90% 0,#174b42,transparent 42%),#081522}header{padding:18px max(18px,calc((100vw - 1050px)/2));background:#0d2130;border-bottom:1px solid #2d5c58;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.brand{font-weight:900;color:#79e5ad;letter-spacing:1px}.muted{color:#a9bed0;font-size:13px}main{max-width:1050px;margin:28px auto;padding:0 18px}.panel{background:#112538;border:1px solid #31546b;border-radius:17px;padding:25px;box-shadow:0 15px 40px #0004}h1{font-size:clamp(27px,4vw,42px)}p,li{line-height:1.65;color:#c0d0df}.tag{color:#7ce8b7;font-size:12px;font-weight:800;letter-spacing:2px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:17px}.card{background:#0b1c2d;border:1px solid #2d4c63;padding:18px;border-radius:12px}.btn,.option{cursor:pointer;border-radius:9px;font:inherit}.btn{background:#77e4af;color:#08251e;border:0;padding:12px 18px;font-weight:800}.btn.secondary{background:#304d66;color:white;font-weight:600}.btn:disabled{opacity:.4;cursor:default}.option{display:block;width:100%;text-align:left;background:#1a344b;color:white;border:1px solid #42637b;padding:13px;margin:9px 0;line-height:1.5}.option:hover:not(:disabled){border-color:#7ce8b7}.option:disabled{opacity:.7;cursor:default}.editor{width:100%;min-height:260px;background:#071522;border:1px solid #53758c;border-radius:10px;color:#baf8dc;padding:14px;font:14px/1.6 ui-monospace,Consolas,monospace;resize:vertical}.terminal{background:#071522;border:1px solid #315e60;padding:15px;border-radius:10px;color:#baf8dc;white-space:pre-wrap;font:13px/1.65 ui-monospace,Consolas,monospace}input{background:#091b2c;color:white;border:1px solid #50718a;border-radius:8px;padding:12px;font:inherit;max-width:100%}label{display:block;font-weight:700;margin:12px 0 7px}.notice{padding:13px;margin:16px 0;border-left:4px solid #72dbb1;background:#1b3940;border-radius:7px}.notice.bad{border-color:#f6a4a4;background:#482b37}.toast{position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:10;max-width:min(560px,92vw);box-shadow:0 10px 30px #0008}.steps{display:flex;gap:7px;margin-bottom:18px}.step{height:8px;background:#2c465c;flex:1;border-radius:10px}.step.done{background:#78e3ad}.step.active{background:#e9c779}.step.skipped{background:#f6a4a4}.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between}.pill{background:#27465b;padding:7px 11px;border-radius:20px;font-size:13px}.hint{color:#e9d394;font-size:13px}.score{font-size:38px;color:#7ce8b7;font-weight:900}details{background:#0b1c2d;padding:12px 15px;border-radius:10px;margin:12px 0}summary{cursor:pointer;font-weight:700}code{color:#a9efcf;font-family:ui-monospace,Consolas,monospace}.goals{padding-left:20px}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid #e9c779;outline-offset:3px}@media(max-width:720px){.grid{grid-template-columns:1fr}.panel{padding:17px}}@media print{body{background:white;color:black}header,.btn,.steps{display:none}.panel,.card{color:black;background:white;box-shadow:none}p{color:#333}}
+</style>
+</head>
+<body>
+<header>
+  <div><div class="brand">◈ MISIÓN WEB INICIAL</div><div class="muted">SIMULADOR EDUCATIVO · INTRODUCCIÓN A LA PROGRAMACIÓN WEB</div></div>
+  <div class="row"><span id="who" class="muted">SIN IDENTIFICAR</span><span id="phase" class="pill">SIN INICIAR</span></div>
+</header>
+<main id="app"></main>
+<div id="toast" class="notice bad toast" hidden></div>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const KEY = 'mision_web_inicial_pia_v2';
+const TEACHER_PASS = 'tech01';
+const PENALTY = 4;       // por cada respuesta o intento incorrecto
+const SKIP_COST = 12;    // por saltar una misión
+// Ayudas de código (se piden una por una; cada una cuesta puntos):
+const HELP_COST = {hint: 2, where: 3, fix: 3}; // pista general, ubicación de errores, cada corrección concreta
+const SOLUTION_COST = 15;                      // ver la solución completa (100 %) de una sola vez
+const names = ['Explorar la web','Reparar HTML','Dar estilo con CSS','JavaScript básico','Interactividad y formularios','Publicar el proyecto'];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// El texto entre `comillas invertidas` se muestra como código.
+const fmt = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+const num = () => String(state.stage + 1).padStart(2, '0');
+
+/* ---------- PREGUNTAS ----------
+   ok  = respuesta correcta
+   bad = distractores (se mezclan al azar con la correcta)
+   h   = pista que se muestra si se equivoca (no revela la respuesta)
+   why = explicación que se muestra al acertar */
+const questions = [
+  [ // 1 · Explorar la web
+    {q:'Escribes `https://ejemplo.com/contacto` en el navegador. ¿Qué ocurre antes de que el navegador pueda pedir la página al servidor?',
+     ok:'El navegador consulta un servidor DNS para obtener la dirección IP de ejemplo.com',
+     bad:['El servidor envía la página por su cuenta, sin que el navegador la pida','El navegador descarga primero todas las páginas del sitio ejemplo.com','El sistema operativo genera el HTML de la página a partir de la URL'],
+     h:'Las computadoras se comunican con números (direcciones IP), no con nombres de dominio.',
+     why:'El DNS traduce el nombre de dominio a una dirección IP; después el navegador envía la solicitud HTTP a ese servidor.'},
+    {q:'Un servidor responde a una solicitud con el código de estado HTTP `404`. ¿Qué significa?',
+     ok:'El recurso solicitado no existe en el servidor',
+     bad:['El servidor tuvo un error interno al procesar la solicitud','El usuario no tiene permiso para ver el recurso','El recurso se movió de forma permanente a otra dirección'],
+     h:'Los códigos 4xx indican un problema con lo que se pidió; piensa en el error más común al escribir mal una URL.',
+     why:'404 = Not Found. Un error interno sería 500, falta de permiso 403 y un traslado permanente 301.'},
+    {q:'¿Cuál es la diferencia principal entre HTTP y HTTPS?',
+     ok:'HTTPS cifra la información que viaja entre el navegador y el servidor',
+     bad:['HTTPS permite que la página funcione sin conexión a internet','HTTPS usa un lenguaje distinto de HTML para escribir las páginas','HTTPS hace que el servidor almacene una copia de la página en tu computadora'],
+     h:'La "S" viene de "secure" (seguro).',
+     why:'HTTPS añade una capa de cifrado (TLS) para que nadie en el camino pueda leer o modificar los datos.'},
+    {q:'En la URL `https://tienda.com/productos/zapatos`, ¿cómo se llama la parte `/productos/zapatos`?',
+     ok:'La ruta',
+     bad:['El dominio','El protocolo','El puerto'],
+     h:'Indica la ubicación del recurso dentro del sitio, después del nombre del servidor.',
+     why:'https es el protocolo, tienda.com el dominio y /productos/zapatos la ruta del recurso.'},
+    {q:'¿Qué combinación describe correctamente el papel de cada tecnología en una página web?',
+     ok:'HTML da la estructura, CSS la presentación y JavaScript el comportamiento',
+     bad:['CSS da la estructura, HTML la presentación y JavaScript el comportamiento','HTML da la estructura, JavaScript la presentación y CSS el comportamiento','JavaScript da la estructura, CSS la presentación y HTML el comportamiento'],
+     h:'Piensa en el esqueleto, la ropa y los movimientos de una persona.',
+     why:'HTML organiza el contenido, CSS controla cómo se ve y JavaScript responde a las acciones del usuario.'}
+  ],
+  [ // 2 · Reparar HTML
+    {q:'¿Dónde debe colocarse la etiqueta `<title>` de una página?',
+     ok:'Dentro de `<head>`',
+     bad:['Dentro de `<body>`, antes del contenido','Antes de `<!doctype html>`','Dentro de la etiqueta `<h1>`'],
+     h:'El título aparece en la pestaña del navegador, no en el contenido visible de la página.',
+     why:'<title> es información sobre el documento (metadatos), por eso va dentro de <head>.'},
+    {q:'¿Qué atributo de `<img>` permite a los lectores de pantalla describir la imagen a personas con discapacidad visual?',
+     ok:'`alt`',
+     bad:['`src`','`href`','`width`'],
+     h:'Este atributo también se muestra si la imagen no puede cargarse.',
+     why:'alt contiene un texto alternativo que describe la imagen; src solo indica dónde está el archivo.'},
+    {q:'¿Cuál de estos fragmentos está correctamente anidado?',
+     ok:'`<p><strong>Hola</strong></p>`',
+     bad:['`<p><strong>Hola</p></strong>`','`<strong><p>Hola</strong></p>`','`<p>Hola<strong></p>`'],
+     h:'La última etiqueta que se abre debe ser la primera que se cierra.',
+     why:'Las etiquetas se cierran en orden inverso a como se abren, como cajas dentro de cajas.'},
+    {q:'¿Qué etiqueta es la más adecuada, semánticamente, para agrupar el menú de navegación de un sitio?',
+     ok:'`<nav>`',
+     bad:['`<div>`','`<menubar>`','`<aside>`'],
+     h:'HTML5 tiene una etiqueta semántica cuyo nombre abrevia "navegación".',
+     why:'<nav> indica a navegadores y lectores de pantalla que ese bloque contiene enlaces de navegación. <div> funciona pero no aporta significado.'}
+  ],
+  [ // 3 · Dar estilo con CSS
+    {q:'Un elemento tiene `class="aviso" id="principal"`. Existen las reglas `#principal { color: red; }` y, más abajo, `.aviso { color: green; }`. ¿De qué color se ve el texto?',
+     ok:'Rojo, porque el selector de id es más específico que el de clase',
+     bad:['Verde, porque la última regla escrita siempre gana','Verde, porque las clases tienen prioridad sobre los id','Ninguno: las dos reglas se anulan y queda el color por defecto'],
+     h:'El orden solo decide cuando dos selectores tienen la misma especificidad.',
+     why:'La especificidad de un id es mayor que la de una clase, así que #principal gana aunque esté antes.'},
+    {q:'¿Qué propiedad agrega espacio DENTRO del borde de un elemento, entre el borde y su contenido?',
+     ok:'`padding`',
+     bad:['`margin`','`border-spacing`','`outline`'],
+     h:'Recuerda el modelo de caja: contenido, relleno, borde y margen.',
+     why:'padding es el relleno interior; margin es el espacio exterior, fuera del borde.'},
+    {q:'¿Qué selector aplica estilos a todos los enlaces `<a>` que están dentro de un `<nav>`?',
+     ok:'`nav a`',
+     bad:['`nav + a`','`nav.a`','`a#nav`'],
+     h:'El selector descendiente se escribe separando los dos selectores con un espacio.',
+     why:'"nav a" selecciona cualquier <a> descendiente de <nav>. "nav + a" seleccionaría solo un <a> que esté justo después del nav.'}
+  ],
+  [ // 4 · JavaScript básico
+    {q:'¿Qué muestra `console.log("5" + 3)`?',
+     ok:'`53`',
+     bad:['`8`','Un error, porque no se puede sumar texto y número','`NaN`'],
+     h:'Si uno de los dos valores es texto, el operador + une en lugar de sumar.',
+     why:'Con un string, + concatena: "5" + 3 produce el texto "53".'},
+    {q:'¿Qué operador compara si dos valores son iguales en valor Y en tipo?',
+     ok:'`===`',
+     bad:['`==`','`=`','`=>`'],
+     h:'Uno de estos asigna, otro convierte tipos antes de comparar y otro define funciones.',
+     why:'=== es la igualdad estricta: 5 === "5" es false. == convierte tipos (5 == "5" es true) y = asigna.'},
+    {q:'¿Qué ocurre al ejecutar `const x = 10; x = 20;`?',
+     ok:'Se produce un error, porque una constante no se puede reasignar',
+     bad:['`x` pasa a valer 20','`x` se queda en 10 y la segunda instrucción se ignora','`x` pasa a valer 30'],
+     h:'Piensa en la diferencia entre let y const.',
+     why:'const crea una referencia que no se puede reasignar; intentarlo lanza un TypeError.'},
+    {q:'¿Cuántas veces se ejecuta el bloque de `for (let i = 0; i < 5; i++) { ... }`?',
+     ok:'5 veces',
+     bad:['4 veces','6 veces','Infinitas veces'],
+     h:'Escribe los valores que toma i mientras la condición sea verdadera.',
+     why:'i toma los valores 0, 1, 2, 3 y 4: cinco repeticiones. Con i = 5 la condición ya es falsa.'}
+  ],
+  [ // 5 · Interactividad y formularios
+    {q:'¿Cómo se obtiene lo que el usuario escribió en `<input id="nombre">`?',
+     ok:'`document.getElementById("nombre").value`',
+     bad:['`document.getElementById("nombre").textContent`','`document.getElementById("nombre").innerHTML`','`document.getElementById("nombre").text`'],
+     h:'Un input no tiene contenido entre etiquetas; lo escrito se guarda en una propiedad especial.',
+     why:'Los campos de formulario guardan lo que escribe el usuario en la propiedad value.'},
+    {q:'Dentro del evento `submit` de un formulario, ¿qué hace `event.preventDefault()`?',
+     ok:'Evita que el navegador envíe el formulario y recargue la página, para manejarlo con JavaScript',
+     bad:['Borra todos los campos del formulario','Desactiva el botón de envío de forma permanente','Comprueba automáticamente que el correo sea válido'],
+     h:'"Default" se refiere a la acción que el navegador haría normalmente.',
+     why:'preventDefault cancela la acción por defecto del evento; en submit, el envío y la recarga de la página.'},
+    {q:'¿Qué atributo HTML impide enviar un formulario si un campo está vacío, sin escribir JavaScript?',
+     ok:'`required`',
+     bad:['`placeholder`','`value`','`disabled`'],
+     h:'Su nombre en inglés significa "obligatorio".',
+     why:'required hace que el navegador valide el campo antes de enviar. placeholder solo muestra un texto de ejemplo.'},
+    {q:'Para mostrar en la página un texto escrito por el usuario, ¿por qué es mejor `textContent` que `innerHTML`?',
+     ok:'Porque no interpreta etiquetas HTML, lo que evita que se inyecte código en la página',
+     bad:['Porque permite que el usuario escriba en negrita o cursiva','Porque innerHTML ya no funciona en los navegadores modernos','Porque textContent guarda el texto de forma permanente en el servidor'],
+     h:'Piensa qué pasaría si alguien escribe <script> en el campo.',
+     why:'textContent trata todo como texto plano; innerHTML interpretaría etiquetas y podría ejecutar código malicioso.'}
+  ],
+  [ // 6 · Publicar el proyecto
+    {q:'¿Qué nombre debe tener la página principal para que el servidor la muestre automáticamente al visitar el dominio?',
+     ok:'`index.html`',
+     bad:['`home.html`','`principal.html`','`main.html`'],
+     h:'Es la convención que usan casi todos los servidores web, incluido GitHub Pages.',
+     why:'Los servidores buscan index.html por defecto cuando la URL apunta a una carpeta.'},
+    {q:'Desde `index.html` (en la raíz del proyecto) escribes `<link rel="stylesheet" href="css/estilos.css">`. ¿Dónde debe estar el archivo de estilos?',
+     ok:'Dentro de una carpeta `css` ubicada junto a `index.html`',
+     bad:['En la misma carpeta que `index.html`, sin subcarpetas','En una carpeta `css` dentro del escritorio de la computadora','En la carpeta raíz del disco `C:`'],
+     h:'Una ruta relativa empieza a contar desde la carpeta del archivo que la escribe.',
+     why:'"css/estilos.css" es relativa: busca la carpeta css en el mismo lugar donde está index.html.'},
+    {q:'¿Cuál es el orden correcto de comandos Git para guardar cambios y subirlos a GitHub?',
+     ok:'`git add` → `git commit` → `git push`',
+     bad:['`git commit` → `git add` → `git push`','`git push` → `git add` → `git commit`','`git add` → `git push` → `git commit`'],
+     h:'Primero eliges qué cambios guardar, luego creas la versión y al final la envías.',
+     why:'add prepara los archivos, commit registra la versión en tu historial local y push la sube al repositorio remoto.'},
+    {q:'Una imagen se ve en tu computadora pero NO en GitHub Pages. El código es `<img src="img/Logo.png" alt="Logo">` y el archivo se llama `logo.png`. ¿Cuál es la causa más probable?',
+     ok:'GitHub Pages distingue mayúsculas de minúsculas en los nombres de archivo',
+     bad:['GitHub Pages no admite imágenes en formato PNG','Falta hacer un commit dentro de la etiqueta img','Las imágenes solo funcionan con HTTP y GitHub Pages usa HTTPS'],
+     h:'Compara con mucho cuidado el nombre escrito en el código con el nombre real del archivo.',
+     why:'Windows ignora mayúsculas en los nombres, pero los servidores web normalmente no: Logo.png y logo.png son archivos distintos.'},
+    {q:'¿Qué tipo de sitio puede publicar GitHub Pages directamente?',
+     ok:'Un sitio estático formado por archivos HTML, CSS, JavaScript e imágenes',
+     bad:['Una aplicación en PHP conectada a una base de datos MySQL','Un sitio que necesita ejecutar programas en el servidor para cada visita','Únicamente documentos de Word y PDF'],
+     h:'GitHub Pages solo entrega archivos tal como están; no ejecuta código en el servidor.',
+     why:'GitHub Pages sirve archivos estáticos. Para PHP o bases de datos se necesita otro tipo de hosting.'}
+  ]
+];
+
+/* ---------- RETOS DE CÓDIGO (misiones 2 a 5) ---------- */
+const report = (fails, total) => fails.length ? `Cumples ${total - fails.length} de ${total} requisitos. Revisa: ${fails.join('; ')}.` : '';
+
+const tasks = {
+  1: {
+    title: 'Repara la página del centro comunitario',
+    goal: [
+      'El `<title>` con el texto "Centro Comunitario" debe estar en el lugar correcto del documento.',
+      'Debe haber un único título principal `<h1>` con el texto "Centro Comunitario".',
+      'La imagen debe tener un texto alternativo que la describa.',
+      'El enlace "Ver horarios" debe llevar a `horarios.html`.'
+    ],
+    starter: '<!doctype html>\n<html lang="es">\n<head>\n  <meta charset="utf-8">\n</head>\n<body>\n  <title>Centro Comunitario</title>\n  <h2>Centro Comunitario</h2>\n  <p>Bienvenidos a nuestras actividades.</p>\n  <img src="img/logo.png">\n  <a>Ver horarios</a>\n</body>\n</html>',
+    hint: 'Hay cuatro errores. Piensa en qué va dentro de head y qué dentro de body, qué etiqueta de encabezado es la principal y qué atributos necesitan img y a para funcionar bien.',
+    where: 'Los errores están en: la línea de `<title>` (fíjate dentro de qué etiqueta está), la línea de `<h2>`, la etiqueta `<img>` y la etiqueta `<a>`.',
+    fixes: ['Corta la línea `<title>Centro Comunitario</title>` y pégala dentro de `<head>`, debajo del meta.','Cambia `<h2>` y `</h2>` por `<h1>` y `</h1>`.','Agrega a la imagen un atributo `alt`, por ejemplo `alt="Logo del centro comunitario"`.','Agrega al enlace el atributo `href="horarios.html"`.'],
+    solution: '<!doctype html>\n<html lang="es">\n<head>\n  <meta charset="utf-8">\n  <title>Centro Comunitario</title>\n</head>\n<body>\n  <h1>Centro Comunitario</h1>\n  <p>Bienvenidos a nuestras actividades.</p>\n  <img src="img/logo.png" alt="Logo del centro comunitario">\n  <a href="horarios.html">Ver horarios</a>\n</body>\n</html>',
+    check(code) {
+      const d = new DOMParser().parseFromString(code, 'text/html'), fails = [];
+      const t = d.head.querySelector('title');
+      if (!t || t.textContent.trim() !== 'Centro Comunitario') fails.push('la ubicación o el texto del <title>');
+      const h1 = d.querySelectorAll('h1');
+      if (h1.length !== 1 || h1[0].textContent.trim() !== 'Centro Comunitario') fails.push('el título principal visible');
+      const img = d.querySelector('img');
+      if (!img || !(img.getAttribute('alt') || '').trim()) fails.push('la imagen');
+      const a = [...d.querySelectorAll('a')].find(x => x.textContent.trim() === 'Ver horarios');
+      if (!a || (a.getAttribute('href') || '').trim() !== 'horarios.html') fails.push('el enlace "Ver horarios"');
+      return report(fails, 4);
+    }
+  },
+  2: {
+    title: 'Repara los estilos del título y del botón',
+    goal: [
+      'El título con `id="titulo"` debe verse de color `blue`, con tamaño de `28px` y centrado.',
+      'El botón con `class="boton"` debe tener fondo `green` y un relleno de `10px` en todos sus lados.',
+      'No cambies el HTML: corrige solo el CSS.'
+    ],
+    starter: '<style>\n  .titulo {\n    colour: red;\n    font-size: 18 px;\n  }\n\n  .boton {\n    background-color: green\n    padding: 10px;\n  }\n</style>\n\n<h1 id="titulo">Centro Comunitario</h1>\n<button class="boton">Inscribirme</button>',
+    hint: 'Hay errores de selector, de escritura de propiedades y de puntuación. Revisa qué símbolo selecciona un id, cómo se escribe la propiedad de color en CSS, si un número y su unidad pueden llevar espacio, y qué separa una declaración de la siguiente. Para centrar texto existe una propiedad que aún no aparece.',
+    where: 'En la regla del título: el selector, el nombre de la propiedad de color, su valor, el valor de font-size y falta una propiedad para centrar. En la regla del botón: falta un signo de puntuación al final de la línea de background-color.',
+    fixes: ['Cambia el selector `.titulo` por `#titulo` (el punto selecciona clases; el # selecciona id).','Cambia `colour: red;` por `color: blue;`.','Cambia `18 px` por `28px` (sin espacio entre el número y la unidad).','Agrega la línea `text-align: center;` dentro de `#titulo`.','Agrega un `;` al final de `background-color: green`.'],
+    solution: '<style>\n  #titulo {\n    color: blue;\n    font-size: 28px;\n    text-align: center;\n  }\n\n  .boton {\n    background-color: green;\n    padding: 10px;\n  }\n</style>\n\n<h1 id="titulo">Centro Comunitario</h1>\n<button class="boton">Inscribirme</button>',
+    check(code) {
+      // Se aplica el CSS dentro de un Shadow DOM para medir los estilos reales sin afectar la página.
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-10000px;top:0;width:900px';
+      document.body.appendChild(host);
+      try {
+        const root = host.attachShadow({mode: 'open'});
+        root.innerHTML = code;
+        const h = root.getElementById('titulo'), b = root.querySelector('.boton');
+        if (!h) return 'No se encontró el título con id="titulo". No cambies el HTML.';
+        if (!b) return 'No se encontró el botón con class="boton". No cambies el HTML.';
+        const cs = getComputedStyle(h), bs = getComputedStyle(b), fails = [];
+        if (cs.color !== 'rgb(0, 0, 255)') fails.push('el color del título');
+        if (cs.fontSize !== '28px') fails.push('el tamaño del título');
+        if (cs.textAlign !== 'center') fails.push('la alineación del título');
+        if (bs.backgroundColor !== 'rgb(0, 128, 0)') fails.push('el fondo del botón');
+        if (['Top','Right','Bottom','Left'].some(s => bs['padding' + s] !== '10px')) fails.push('el relleno del botón');
+        return report(fails, 5);
+      } finally { host.remove(); }
+    }
+  },
+  3: {
+    title: 'Calcula el total de una compra con descuento',
+    goal: [
+      'La función `calcularTotal(precio, cantidad)` debe devolver el precio multiplicado por la cantidad.',
+      'Si la cantidad es 10 o más, se aplica un 10% de descuento sobre ese total.',
+      'Ejemplo: `calcularTotal(5, 10)` debe devolver `45`.'
+    ],
+    starter: 'function calcularTotal(precio, cantidad) {\n  let total = precio + cantidad;\n\n  if (cantidad > 10) {\n    total = total - 10;\n  }\n\n  return total;\n}',
+    hint: 'Hay tres errores: el operador aritmético, el operador de comparación ("10 o más") y la forma de calcular el descuento. Un 10% de descuento no es restar 10: es quedarse con el 90% del total.',
+    where: 'Hay un error en la línea de `let total`, otro en la condición del `if` y otro en la línea que aplica el descuento.',
+    fixes: ['Cambia `precio + cantidad` por `precio * cantidad`.','Cambia `cantidad > 10` por `cantidad >= 10` (debe incluir el 10).','Cambia `total = total - 10;` por `total = total * 0.9;` (pagar el 90% equivale a un 10% de descuento).'],
+    solution: 'function calcularTotal(precio, cantidad) {\n  let total = precio * cantidad;\n\n  if (cantidad >= 10) {\n    total = total * 0.9;\n  }\n\n  return total;\n}',
+    check(code) {
+      let fn;
+      try { fn = new Function('"use strict";' + code + '\n;return typeof calcularTotal === "function" ? calcularTotal : null;')(); }
+      catch (e) { return 'Error de sintaxis: ' + e.message; }
+      if (typeof fn !== 'function') return 'No se encontró la función calcularTotal. Conserva su nombre.';
+      const tests = [[10,3,30],[7,2,14],[0,5,0],[12.5,4,50],[3,9,27],[5,10,45],[2,20,36],[100,12,1080]];
+      for (const [p, c, r] of tests) {
+        let got;
+        try { got = fn(p, c); } catch (e) { return `Tu función produjo un error con precio = ${p} y cantidad = ${c}: ${e.message}`; }
+        if (typeof got !== 'number' || Math.abs(got - r) > 1e-9) return `Falla con precio = ${p} y cantidad = ${c}: se esperaba ${r} y tu función devolvió ${got}.`;
+      }
+      return '';
+    }
+  },
+  4: {
+    title: 'Haz funcionar el saludo del formulario',
+    goal: [
+      'Al pulsar el botón `#saludar`, el párrafo `#mensaje` debe mostrar "Hola, " seguido del nombre escrito. Ejemplo: "Hola, Ana".',
+      'Si el campo está vacío o solo tiene espacios, debe mostrar "Escribe tu nombre".',
+      'No cambies los id de los elementos.'
+    ],
+    starter: '<input id="nombre" placeholder="Tu nombre">\n<button id="saludar">Saludar</button>\n<p id="mensaje">Esperando...</p>\n\n<script>\n  document.getElementById("saludo").addEventListener("click", () => {\n    const nombre = document.getElementById("nombre").textContent;\n    document.getElementById("mensaje").textContent = "Hola, " + nombre;\n  });\n<\/script>',
+    hint: 'Compara el id que busca el script con el id real del botón. Recuerda qué propiedad guarda lo que se escribe en un input. Para detectar un campo "solo con espacios" te sirve el método trim() y una estructura if / else.',
+    where: 'Revisa el id dentro de `getElementById("saludo")`, la propiedad que se lee del input en la línea de `const nombre`, y fíjate que falta una condición para el campo vacío antes de mostrar el saludo.',
+    fixes: ['Cambia `getElementById("saludo")` por `getElementById("saludar")`.','Cambia `.textContent` por `.value.trim()` en la línea de `const nombre`.','Agrega un `if (nombre === "")` que muestre `"Escribe tu nombre"`, y en el `else` muestra `"Hola, " + nombre`.'],
+    solution: '<input id="nombre" placeholder="Tu nombre">\n<button id="saludar">Saludar</button>\n<p id="mensaje">Esperando...</p>\n\n<script>\n  document.getElementById("saludar").addEventListener("click", () => {\n    const nombre = document.getElementById("nombre").value.trim();\n    const mensaje = document.getElementById("mensaje");\n    if (nombre === "") {\n      mensaje.textContent = "Escribe tu nombre";\n    } else {\n      mensaje.textContent = "Hola, " + nombre;\n    }\n  });\n<\/script>',
+    check(code) {
+      const d = new DOMParser().parseFromString(code, 'text/html');
+      const inp = d.getElementById('nombre'), b = d.getElementById('saludar'), p = d.getElementById('mensaje');
+      if (!inp || !b || !p) return 'Falta el campo #nombre, el botón #saludar o el párrafo #mensaje. No cambies sus id.';
+      const js = [...d.querySelectorAll('script')].map(s => s.textContent).join('\n');
+      if (!js.trim()) return 'Falta el script.';
+      let lastErr = '';
+      const onErr = e => { lastErr = e.message; e.preventDefault(); };
+      window.addEventListener('error', onErr);
+      try {
+        try { new Function('document', js)(d); } catch (e) { return 'Error en el JavaScript: ' + e.message; }
+        const cases = [['Ana','Hola, Ana'],['','Escribe tu nombre'],['   ','Escribe tu nombre'],['Luis','Hola, Luis']];
+        for (const [v, exp] of cases) {
+          inp.value = v; p.textContent = 'Esperando...'; lastErr = '';
+          b.click();
+          if (lastErr) return 'Al pulsar el botón se produjo un error: ' + lastErr;
+          const got = p.textContent.trim();
+          const desc = v === '' ? 'vacío' : v.trim() === '' ? 'con solo espacios' : `con "${v}"`;
+          if (got !== exp) return `Con el campo ${desc}, se esperaba "${exp}" y se obtuvo "${got}".`;
+        }
+        return '';
+      } finally { window.removeEventListener('error', onErr); }
+    }
+  }
+};
+
+/* ---------- ESTADO ---------- */
+const init = () => ({name:'',stage:0,score:100,errors:0,completed:[],q:0,answers:{},penalties:[],helps:{},skipped:[],started:0,finished:0,locked:false,absences:0,blocked:false});
+let state = init();
+try { const old = JSON.parse(localStorage.getItem(KEY)); if (old && old.name) state = {...init(), ...old}; } catch (e) {}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+// Mezcla estable de opciones: cambia por estudiante, pero no al recargar.
+function seedOf(s) { let h = 2166136261; for (const c of s) { h ^= c.codePointAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function shuffled(n, seed) {
+  const a = [...Array(n).keys()]; let t = seed;
+  const r = () => { t = (t + 0x6D2B79F5) | 0; let x = Math.imul(t ^ (t >>> 15), 1 | t); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+/* ---------- INTERFAZ ---------- */
+function head() {
+  $('who').textContent = state.name || 'SIN IDENTIFICAR';
+  $('phase').textContent = state.blocked ? 'ACTIVIDAD SUSPENDIDA' : state.locked ? 'FINALIZADA' : state.name ? 'MISIÓN ' + (state.stage + 1) + '/6' : 'SIN INICIAR';
+}
+function shell(html) {
+  head();
+  const top = state.name && !state.locked && !state.blocked
+    ? `<div class="steps">${names.map((n, i) => `<div class="step ${state.skipped.includes(i) ? 'skipped' : state.completed.includes(i) ? 'done' : i === state.stage ? 'active' : ''}" title="${esc(n)}${state.skipped.includes(i) ? ' (omitida)' : ''}"></div>`).join('')}</div>
+       <div class="row" style="margin-bottom:15px"><span class="tag">MISIÓN ${state.stage + 1} · ${names[state.stage]}</span><span class="pill">${state.score}/100 puntos · ${state.errors} errores</span></div>`
+    : '';
+  $('app').innerHTML = top + html;
+}
+function notice(msg, good = true) {
+  const e = $('notice'); if (!e) return;
+  e.className = 'notice' + (good ? '' : ' bad'); e.textContent = msg; e.hidden = false;
+  e.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+let toastTimer = null;
+function warn(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 7000); }
+
+function deduct(pts, msg, isError = false) {
+  state.score = Math.max(0, state.score - pts);
+  if (isError) state.errors++;
+  state.penalties.push({stage: state.stage + 1, pts, msg});
+}
+function penalty(msg) {
+  deduct(PENALTY, msg, true);
+  save(); render();
+  notice('−' + PENALTY + ' puntos. ' + msg + ' Puedes corregirlo y volver a intentar.', false);
+}
+const toggle = id => { const e = $(id); if (e) e.hidden = !e.hidden; };
+function saveEditor() { const ed = $('editor'); if (ed) state.answers[state.stage] = ed.value; }
+
+/* ---------- SALTAR MISIÓN ---------- */
+function skipBox() {
+  return `<div style="margin-top:22px;border-top:1px solid #31546b;padding-top:14px">
+    <button class="btn secondary" onclick="toggle('skipConfirm')">⏭ Saltar esta misión (−${SKIP_COST} pts)</button>
+    <div id="skipConfirm" class="notice bad" hidden>¿Seguro que quieres saltar esta misión? Se descontarán ${SKIP_COST} puntos y quedará registrada como <strong>no superada</strong> en la constancia final.
+      <div class="row" style="justify-content:flex-start;margin-top:10px"><button class="btn" onclick="skipMission()">Sí, saltar misión</button><button class="btn secondary" onclick="toggle('skipConfirm')">Cancelar</button></div></div>
+  </div>`;
+}
+function skipMission() {
+  if (state.completed.includes(state.stage)) return;
+  saveEditor();
+  deduct(SKIP_COST, 'Misión omitida: ' + names[state.stage]);
+  state.skipped.push(state.stage);
+  state.completed.push(state.stage);
+  save(); render();
+  notice('Saltaste la misión. Se descontaron ' + SKIP_COST + ' puntos.', false);
+}
+
+/* ---------- AYUDAS DE CÓDIGO ---------- */
+function helpSteps(t) {
+  return [
+    {title: 'Pista general', text: t.hint, cost: HELP_COST.hint},
+    {title: 'Dónde están los errores', text: t.where, cost: HELP_COST.where},
+    ...t.fixes.map((f, i) => ({title: `Corrección ${i + 1} de ${t.fixes.length}`, text: f, cost: HELP_COST.fix}))
+  ];
+}
+const helpState = () => state.helps[state.stage] || (state.helps[state.stage] = {n: 0, sol: false});
+function askHelp() {
+  const t = tasks[state.stage]; if (!t) return;
+  saveEditor();
+  const h = helpState(), steps = helpSteps(t);
+  if (h.sol || h.n >= steps.length) return;
+  const s = steps[h.n]; h.n++;
+  deduct(s.cost, 'Ayuda de código: ' + s.title);
+  save(); render();
+  notice(`Ayuda desbloqueada: "${s.title}". Se descontaron ${s.cost} puntos.`, false);
+}
+function askSolution() {
+  const t = tasks[state.stage]; if (!t) return;
+  saveEditor();
+  const h = helpState(); if (h.sol) return;
+  h.sol = true;
+  deduct(SOLUTION_COST, 'Ayuda de código: solución completa');
+  save(); render();
+  notice(`Solución completa desbloqueada. Se descontaron ${SOLUTION_COST} puntos. Revísala con calma para entender cada cambio.`, false);
+}
+function useSolution() {
+  const t = tasks[state.stage]; if (!t || !helpState().sol) return;
+  state.answers[state.stage] = t.solution; save(); render();
+  notice('Se copió la solución en el editor. Compárala con el código original y luego presiona «Probar mi solución».');
+}
+function helpBox(t) {
+  const h = helpState(), steps = helpSteps(t), shown = h.sol ? steps.length : h.n, nextStep = steps[h.n];
+  const list = steps.slice(0, shown).map(s => `<div class="card" style="margin:8px 0;padding:12px"><strong class="hint">💡 ${esc(s.title)}</strong><p style="margin:6px 0 0">${fmt(s.text)}</p></div>`).join('');
+  const sol = h.sol ? `<div class="card" style="margin:8px 0;padding:12px"><strong class="hint">🔓 Solución completa</strong><div class="terminal" style="margin-top:8px">${esc(t.solution)}</div><button class="btn secondary" style="margin-top:10px" onclick="useSolution()">Copiar solución al editor</button></div>` : '';
+  const used = steps.slice(0, Math.min(h.n, steps.length)).reduce((a, s) => a + s.cost, 0) + (h.sol ? SOLUTION_COST : 0);
+  return `<h3>Ayudas</h3>
+    <p class="hint">Puedes pedir ayudas una por una, cada vez más detalladas, o ver la solución completa. Cada ayuda descuenta puntos.${used ? ` Llevas −${used} pts en ayudas en esta misión.` : ''}</p>
+    ${list}${sol}
+    <div class="row" style="justify-content:flex-start">
+      ${!h.sol && nextStep ? `<button class="btn secondary" onclick="askHelp()">💡 Pedir ayuda: ${esc(nextStep.title)} (−${nextStep.cost} pts)</button>` : ''}
+      ${!h.sol ? `<button class="btn secondary" onclick="toggle('solConfirm')">🔓 Ver solución completa (−${SOLUTION_COST} pts)</button>` : ''}
+    </div>
+    <div id="solConfirm" class="notice bad" hidden>¿Seguro? Se descontarán ${SOLUTION_COST} puntos y verás el código resuelto al 100 %.
+      <div class="row" style="justify-content:flex-start;margin-top:10px"><button class="btn" onclick="askSolution()">Sí, mostrar solución</button><button class="btn secondary" onclick="toggle('solConfirm')">Cancelar</button></div></div>`;
+}
+function win(msg) {
+  if (!state.completed.includes(state.stage)) state.completed.push(state.stage);
+  save(); render();
+  notice('¡Misión superada! ' + msg);
+}
+function next() {
+  if (!state.completed.includes(state.stage)) return;
+  state.stage++; state.q = 0;
+  if (state.stage >= names.length) { state.stage = names.length - 1; state.locked = true; state.finished = Date.now(); }
+  save(); render(); window.scrollTo(0, 0);
+}
+
+function intro() {
+  shell(`<section class="panel"><div class="tag">DESAFÍO DE NIVEL INICIAL</div><h1>◈ Misión Web Inicial</h1>
+  <p>Una comunidad necesita una página web para presentar sus actividades. Te han elegido para ayudar a construirla, darle estilo, añadir interactividad y prepararla para publicarse.</p>
+  <div class="grid"><div class="card"><h3>6 misiones progresivas</h3><p>Preguntas de repaso en todas las misiones y 4 retos de código: reparar HTML, corregir CSS, programar en JavaScript y hacer funcionar un formulario.</p></div>
+  <div class="card"><h3>100 puntos iniciales</h3><p>Cada error resta ${PENALTY} puntos. En los retos de código puedes pedir ayudas, desde una pista hasta la solución completa, y cada una descuenta puntos. Si no puedes con una misión, puedes saltarla (−${SKIP_COST} puntos). La actividad queda cerrada al finalizar.</p></div></div>
+  <p class="hint">Actividad introductoria basada en los contenidos del PIA de Introducción a la programación web.</p>
+  <label for="student">Nombre completo del estudiante</label><input id="student" maxlength="90" placeholder="Nombre y apellido">
+  <div style="margin-top:18px"><button class="btn" onclick="start()">Iniciar misión →</button></div>
+  <div id="notice" class="notice" hidden></div></section>`);
+}
+function start() {
+  const n = $('student').value.trim().replace(/\s+/g, ' ');
+  if (n.length < 5 || !n.includes(' ')) return notice('Ingresa tu nombre completo (nombre y apellido).', false);
+  state = {...init(), name: n, started: Date.now()};
+  save(); render();
+}
+
+function quiz() {
+  const qs = questions[state.stage], q = qs[state.q], opts = [q.ok, ...q.bad];
+  const order = shuffled(opts.length, seedOf(state.name + '|' + state.started + '|' + state.stage + '|' + state.q));
+  shell(`<section class="panel"><h2>${num()} · ${names[state.stage]}</h2>
+  <p>${tasks[state.stage] ? 'Responde las preguntas de repaso. Después tendrás un reto de código.' : 'Selecciona la respuesta correcta.'}</p>
+  <div class="pill">Pregunta ${state.q + 1} de ${qs.length}</div>
+  <div class="card" style="margin-top:15px"><h3>${fmt(q.q)}</h3>${order.map(i => `<button class="option" onclick="answer(${i})">${fmt(opts[i])}</button>`).join('')}</div>
+  <div id="notice" class="notice" hidden></div>${skipBox()}</section>`);
+}
+function answer(i) {
+  const qs = questions[state.stage], q = qs[state.q];
+  if (!q) return render();
+  if (i !== 0) return penalty('Respuesta incorrecta. Pista: ' + q.h);
+  state.q++; save();
+  if (state.q >= qs.length && !tasks[state.stage]) return win('Respondiste correctamente todas las preguntas. ' + q.why);
+  render();
+  notice('¡Correcto! ' + q.why + (state.q >= qs.length ? ' Ahora resuelve el reto de código.' : ''));
+}
+
+function coding() {
+  const t = tasks[state.stage], code = state.answers[state.stage] ?? t.starter;
+  shell(`<section class="panel"><h2>${num()} · ${names[state.stage]}</h2>
+  <p>Ya respondiste las preguntas de repaso. Ahora corrige el fragmento de código para que cumpla todos los requisitos.</p>
+  <div class="grid"><div><h3>${esc(t.title)}</h3><ul class="goals">${t.goal.map(g => `<li>${fmt(g)}</li>`).join('')}</ul>
+  <textarea id="editor" class="editor" spellcheck="false" aria-label="Editor de código">${esc(code)}</textarea>
+  <div class="row" style="margin-top:12px;justify-content:flex-start"><button class="btn" onclick="testCode()">▶ Probar mi solución</button><button class="btn secondary" onclick="resetCode()">↺ Restaurar código inicial</button></div></div>
+  <div><h3>Guía de trabajo</h3><div class="terminal">1. Lee todos los requisitos.\n2. Localiza los errores (puede haber varios).\n3. Modifica el código.\n4. Presiona Probar mi solución.\n5. Lee el mensaje: te dice qué requisito falta.</div>
+  <p class="hint">Puedes probar varias veces. Cada intento incorrecto resta ${PENALTY} puntos.</p>
+  ${helpBox(t)}</div></div>
+  <div id="notice" class="notice" hidden></div>${skipBox()}</section>`);
+}
+function testCode() {
+  const t = tasks[state.stage], code = $('editor').value;
+  state.answers[state.stage] = code; save();
+  let result;
+  try { result = t.check(code); } catch (e) { result = 'Revisa el código: ' + e.message; }
+  if (result) return penalty(result);
+  win('Tu código pasó todas las pruebas del ejercicio.');
+}
+function resetCode() {
+  delete state.answers[state.stage]; save(); render();
+  notice('Se restauró el código inicial.');
+}
+
+function done() {
+  const last = state.stage === names.length - 1, sk = state.skipped.includes(state.stage);
+  shell(`<section class="panel"><div class="tag">${sk ? 'MISIÓN OMITIDA' : 'MISIÓN SUPERADA'}</div><h2>${sk ? '⏭' : '✓'} ${num()} · ${names[state.stage]}</h2>
+  <p>${sk ? 'Saltaste esta misión; quedará registrada como no superada. ' : 'Completaste esta misión. '}${last ? 'Continúa para ver tus resultados finales.' : 'Cuando estés listo, continúa con la siguiente.'}</p>
+  <div id="notice" class="notice" hidden></div>
+  <button id="advance" class="btn" onclick="next()">${last ? 'Ver resultados →' : 'Continuar a la siguiente misión →'}</button></section>`);
+}
+
+function render() {
+  if (!state.name) return intro();
+  if (state.blocked) return blocked();
+  if (state.locked) return finish();
+  if (state.completed.includes(state.stage)) return done();
+  const qs = questions[state.stage];
+  if (state.q < qs.length) return quiz();
+  if (tasks[state.stage]) return coding();
+  // Seguridad: si no hay reto de código y ya se respondieron las preguntas, se da por superada.
+  state.completed.push(state.stage); save(); return done();
+}
+
+function helpTotals() {
+  const hs = Object.values(state.helps || {});
+  const n = hs.reduce((a, h) => a + h.n, 0), sols = hs.filter(h => h.sol).length;
+  return n || sols ? `${n} ayuda${n === 1 ? '' : 's'}${sols ? ` · ${sols} ${sols === 1 ? 'solución completa' : 'soluciones completas'}` : ''}` : 'Ninguna';
+}
+function finish() {
+  const mins = Math.max(1, Math.round((state.finished - state.started) / 60000));
+  shell(`<section class="panel" style="text-align:center"><div class="tag">ACTIVIDAD FINALIZADA</div><h1>✓ ¡Misión Web completada!</h1>
+  <p>Has terminado los seis desafíos de Introducción a la programación web.</p>
+  <div class="grid"><div class="card"><p>Estudiante</p><h2>${esc(state.name)}</h2></div><div class="card"><p>Puntuación final</p><div class="score">${state.score}/100</div></div>
+  <div class="card"><p>Errores registrados</p><h2>${state.errors}</h2></div><div class="card"><p>Duración aproximada</p><h2>${mins} minuto${mins === 1 ? '' : 's'}</h2></div>
+  <div class="card"><p>Misiones superadas</p><h2>${names.length - state.skipped.length} de ${names.length}</h2>${state.skipped.length ? `<p class="muted">Omitidas: ${state.skipped.map(i => esc(names[i])).join(', ')}</p>` : ''}</div>
+  <div class="card"><p>Ayudas de código usadas</p><h2>${helpTotals()}</h2></div></div>
+  <div class="card" style="text-align:left;margin-top:16px"><h3>Registro de penalizaciones</h3>${state.penalties.length ? state.penalties.map(x => `<p>Misión ${x.stage}: −${x.pts} puntos · ${esc(x.msg)}</p>`).join('') : '<p>Sin errores registrados.</p>'}</div>
+  <p class="muted">Los resultados se guardan únicamente en este navegador; no constituyen un registro inviolable.</p>
+  <button class="btn" onclick="window.print()">Imprimir constancia / Guardar PDF</button></section>`);
+}
+
+function blocked() {
+  shell(`<section class="panel"><div class="tag">ACTIVIDAD SUSPENDIDA</div><h1>Se registraron dos salidas de la ventana</h1>
+  <p>Solicita al docente autorización para continuar. Tu progreso y puntuación se conservan.</p>
+  <label for="teacherPassword">Contraseña del docente</label><input id="teacherPassword" type="password" autocomplete="off">
+  <button class="btn" style="margin-left:9px" onclick="unlock()">Reactivar</button><div id="notice" class="notice" hidden></div></section>`);
+}
+function unlock() {
+  if ($('teacherPassword').value !== TEACHER_PASS) return notice('Contraseña incorrecta.', false);
+  state.blocked = false; state.absences = 0; save(); render();
+}
+
+/* ---------- CONTROL DE SALIDAS DE LA VENTANA ---------- */
+let monitorReady = false, away = false, blurTimer = null, dialogOpen = false;
+function awayNow() {
+  if (dialogOpen || !monitorReady || away || !state.name || state.locked || state.blocked) return;
+  away = true;
+  const ed = $('editor'); if (ed) state.answers[state.stage] = ed.value;
+  state.absences++;
+  if (state.absences >= 2) state.blocked = true;
+  save();
+  if (state.blocked) render();
+}
+function back() {
+  clearTimeout(blurTimer);
+  if (document.hidden || !document.hasFocus()) return;
+  if (away && !state.blocked && state.absences === 1) warn('Advertencia 1 de 2: saliste de la actividad. Una segunda salida suspenderá la misión hasta que el docente la reactive.');
+  away = false;
+}
+// Al recargar o cerrar la página no se cuenta la salida en ese momento: se anota la hora
+// y, al volver a abrir, solo cuenta como salida si pasaron más de 5 segundos.
+let unloading = false;
+window.addEventListener('pagehide', () => {
+  unloading = true;
+  if (!state.name || state.locked || state.blocked) return;
+  const ed = $('editor'); if (ed) state.answers[state.stage] = ed.value;
+  state.leftAt = Date.now(); save();
+});
+function checkReturn() {
+  if (!state.leftAt) return;
+  const gone = Date.now() - state.leftAt; delete state.leftAt;
+  if (gone > 5000 && state.name && !state.locked && !state.blocked) {
+    state.absences++;
+    if (state.absences >= 2) state.blocked = true;
+    else setTimeout(() => warn('Advertencia 1 de 2: cerraste o saliste de la actividad. Una segunda salida suspenderá la misión hasta que el docente la reactive.'), 300);
+  }
+  save();
+}
+document.addEventListener('visibilitychange', () => { if (unloading) return; document.hidden ? awayNow() : back(); });
+window.addEventListener('blur', () => { clearTimeout(blurTimer); blurTimer = setTimeout(() => { if (!document.hidden && !document.hasFocus()) awayNow(); }, 650); });
+window.addEventListener('focus', back);
+
+// Reinicio docente: secuencia Arriba Arriba Abajo Abajo Izquierda Derecha Izquierda Derecha B A.
+const combo = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+let ci = 0, ct = 0;
+document.addEventListener('keydown', e => {
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || ['INPUT','TEXTAREA','SELECT'].includes(e.target?.tagName)) return;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (Date.now() - ct > 10000) ci = 0;
+  ct = Date.now();
+  ci = k === combo[ci] ? ci + 1 : (k === combo[0] ? 1 : 0);
+  if (ci === combo.length) {
+    ci = 0; dialogOpen = true;
+    try {
+      if (prompt('Contraseña docente para reiniciar:') === TEACHER_PASS && confirm('¿Reiniciar toda la actividad?')) { state = init(); save(); render(); }
+    } finally { setTimeout(() => dialogOpen = false, 1200); }
+  }
+});
+
+checkReturn();
+// Truco tipo GTA: escribir la palabra secreta en cualquier parte (fuera de los campos de texto) reinicia todo.
+const CHEAT = 'TECHRESET';
+let typed = '';
+document.addEventListener('keydown', e => {
+  if (e.key.length !== 1 || ['INPUT','TEXTAREA'].includes(e.target?.tagName)) return;
+  typed = (typed + e.key.toUpperCase()).slice(-CHEAT.length);
+  if (typed !== CHEAT) return;
+  typed = ''; dialogOpen = true;
+  if (confirm('🔓 Truco activado: ¿reiniciar TODA la actividad?')) { localStorage.removeItem(KEY); state = init(); render(); }
+  setTimeout(() => dialogOpen = false, 1200);
+});
+
+render();
+monitorReady = true;
+</script>
+</body>
+</html>
